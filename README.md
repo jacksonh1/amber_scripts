@@ -42,9 +42,10 @@ Runs replicas at constant volume. Simpler setup, no box size equilibration neede
 
 1. Build system with tleap (solvate, add ions)
 2. Minimization
-3. NVT equilibration (single run across all replicas, using a groupfile)
-4. T-REMD production (all replicas in parallel, exchanging temperatures every `EXCHANGE_EVERY_PS`)
-5. Post-processing: reconstruct 300 K trajectory, compute acceptance rates
+3. NPT density equilibration (convergence-checked: repeats until box volume stabilizes)
+4. Per-replica NVT equilibration (each replica heated to its own target temperature from the same box)
+5. T-REMD production (all replicas in parallel, exchanging temperatures every `EXCHANGE_EVERY_PS`)
+6. Post-processing: reconstruct 300 K trajectory, compute acceptance rates
 
 ### NPT T-REMD
 
