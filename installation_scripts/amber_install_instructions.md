@@ -15,15 +15,15 @@ instructions adapted from:
 https://ambermd.org/GetAmber.php
 
 ```bash
-conda create --name AmberTools25 python=3.12
-conda activate AmberTools25
+conda create --name ambertools25 python=3.12
+conda activate ambertools25
 conda config --add channels conda-forge
 conda config --set channel_priority strict
 conda install dacase::ambertools-dac=25
 conda install -c conda-forge mdanalysis
 ```
 
-Alternatively, recreate the full environment from the provided spec (recommended for reproducibility):
+Alternatively, recreate the full environment from the provided spec:
 
 ```bash
 conda env create -f installation_scripts/environment.yml
@@ -31,7 +31,7 @@ conda env create -f installation_scripts/environment.yml
 
 To use the code:
 ```bash
-conda activate AmberTools25
+conda activate ambertools25
 ```
 there is a file that you can source to use the free version of the simulation stuff `source $CONDA_PREFIX/amber.sh`. Don't do this if you are going to use PMEMD.
 

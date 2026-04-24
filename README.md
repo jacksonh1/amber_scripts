@@ -4,6 +4,8 @@ This readme was made by AI for an existing codebase I wrote. I did edit it.
 
 I would recommend always doing the NPT REMD (as opposed to NVT) as the exchange rates are usually more even across the ladder even if they aren't as high
 
+See [installation_scripts/amber_install_instructions.md](installation_scripts/amber_install_instructions.md) for instructions on installing AmberTools25 and PMEMD24.
+
 Scripts for running Temperature Replica Exchange MD (T-REMD) and standard MD with Amber/pmemd on a SLURM cluster.
 
 ## Repository structure
@@ -167,8 +169,12 @@ ${OUTDIR}/
 ├── mdinfo/                   — mdinfo files
 ├── density_equil/            — NPT only: density equilibration files
 ├── leap/                     — tleap input and log
-└── min/                      — minimization files
+├── min/                      — minimization files
+├── analysis_demux_300K/      — demultiplexed 300 K trajectory files
+└── 300K_export/              — exported 300 K trajectory files (xtc, for easy analysis)
 ```
+
+There are some other files that are exported that might be useful for debugging or analysis (e.g. `rem_accept.dat` with exchange acceptance data, `parameters.txt` with a record of the job parameters, etc). The key outputs for analysis are the trajectories in `analysis_demux_300K/` and `300K_export/`.
 
 Trajectory data lives on scratch (`SCRATCH_ROOT`) and is symlinked into `trajectories/`.
 Copy or move the scratch directory before it is cleaned if you need the raw NetCDF files.
