@@ -1,0 +1,9 @@
+name: ambertools25
+channels:
+  - conda-forge
+  - dacase
+  - defaults
+dependencies:
+  - python=3.12
+  - dacase::ambertools-dac=25
+  - mdanalysis
