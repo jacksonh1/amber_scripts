@@ -4,46 +4,7 @@ Scripts for running Temperature Replica Exchange MD (T-REMD) and standard MD wit
 
 See [installation_scripts/amber_install_instructions.md](installation_scripts/amber_install_instructions.md) for instructions on installing AmberTools25 and PMEMD24.
 
-
-## Recommendations
-
-I would recommend always doing the NPT REMD (as opposed to NVT) as the exchange rates are usually more even across the ladder even if they aren't as high
-
-REMD is usually limited by exchange frequency. You need to get around 20-40% exchange between each replicate, or else trajectories get stuck and the results are not thermodynamically valid. If the trajectories aren't mixing it also defeats the purpose of REMD in the first place because you aren't actually getting the enhanced sampling. If the exchange is too high, it means you're just wasting compute (I think).
-
-The exchange probability is directly related to the energy difference between 2 neighboring replicas. For systems with more atoms, you need closer temperature spacing to get good exchange. So the number of replicates you need depends on the system. Unfortunately, you need 1 cpu per replica with the amber installation I have, so there is a limit on the number of replicas you can use. My amber installation also doesn't allow you to split one job across multiple nodes. You might not want this anyway as the nodes would have to transfer information with each other at every exchange.
-
-I would recommend running a short pilot simulation for your system (maybe ~1 ns) and see what the exchange rates look like. I usually try to span the temperature range of 300-450K, which requires ~48 replicas for my mini-protein systems. This just fits on the 3219-3620 nodes.
-
-Here's parameters I would use for a pilot simulation:
-```bash
-REPLICAS=48
-TOTAL_EXCHANGES=1000
-T_MAX=450
-EXCHANGE_EVERY_PS=1.0
-```
-Simulation time (ns) = ($TOTAL_EXCHANGES * $EXCHANGE_EVERY_PS) / 1000
-
-I usually set EXCHANGE_EVERY_PS to 1ps but I've seen people use 0.5 - 2 ps.
-
-If the exchange rates are good, I'd do a longer production simulation. I usually aim for 40-100ns for this, but it depends on the protein and timescale of the dynamics you're looking for, which vary wildly
-
-If you can't get good exchange you can lower the max temperature. There are other ways to address this issue that I haven't gotten to work. Let me know if you figure out a solution. Here's some ideas:
-- Compile amber with nvhpc or some tool for splitting jobs across nodes so you can increase the replicates to more than 48. You'll have to write new scripts
-- Change from T-REMD to REST2. I've tried getting REST2 to work (called REAF in amber). It worked at one time, then engaging changed some modules or available software and I cannot get it to work anymore. Might be unrelated to software changes but I don't know. Message me if you want that script. I get segfaults and no clear error message. It might be worth trying to patch amber with PLUMED if that's an option. I have moved over to gromacs instead for this reason.
-
-- **Acceptance rates**: should be 20–40%. Check the `rem_accept.dat` file.
-- **Scratch space**: each replica generates ~10 GB/µs. Ensure `SCRATCH_ROOT` has enough space.
-- **Multiple systems**: copy/paste the system block in a submit script (or loop) to submit
-  several systems as different jobs in one script call.
-<!-- - **nodes**: The way that amber is installed in the install scripts, it only supports running a job on 1 node, not splitting across multiple nodes. Splitting across multiple nodes might be slow because information will have to transfer at each exchange step, but if you know better go for it and let me know if it works -->
-
-
-**Other things to look for:**
-- number of round trips - each coordinate set should have multiple trips up and down the temperature ladder
-- dwell time - ideally each coordinate set spends an equal amount of time at each temperature
-- watch out for periodic boundary artifacts - when a protein interacts with its neighboring images across the boundary. I'm working on a check for this. If you notice it, you need to increase the BOX_BUFFER
-
+See the [Recommendations](#recommendations) section for how I would use these tools.
 
 ## Repository structure
 
@@ -218,3 +179,51 @@ There are some other files that are exported that might be useful for debugging 
 Trajectory data lives on scratch (`SCRATCH_ROOT`) and is symlinked into `trajectories/`.
 Copy or move the scratch directory before it is cleaned if you need the raw NetCDF files.
 
+
+## Recommendations
+
+
+- **Acceptance rates**: should be 20–40%. Check the `rem_accept.dat` file.
+- **Scratch space**: each replica generates ~10 GB/µs. Ensure `SCRATCH_ROOT` has enough space.
+- **Multiple systems**: copy/paste the system block in a submit script (or loop) to submit
+  several systems as different jobs in one script call.
+
+
+**Other things to look for:**
+- number of round trips - each coordinate set should have multiple trips up and down the temperature ladder
+- dwell time - ideally each coordinate set spends an equal amount of time at each temperature
+- watch out for periodic boundary artifacts - when a protein interacts with its neighboring images across the boundary. I'm working on a check for this. If you notice it, you need to increase the BOX_BUFFER
+
+
+I would recommend always doing the NPT REMD (as opposed to NVT) as the exchange rates are usually more even across the ladder even if they aren't as high
+
+REMD is usually limited by exchange frequency. You need to get around 20-40% exchange between each replicate, or else trajectories get stuck and the results are not thermodynamically valid. If the trajectories aren't mixing it also defeats the purpose of REMD in the first place because you aren't actually getting the enhanced sampling. If the exchange is too high, it means you're just wasting compute (I think).
+
+The exchange probability is directly related to the energy difference between 2 neighboring replicas. For systems with more atoms, you need closer temperature spacing to get good exchange. So the number of replicates you need depends on the system. Unfortunately, you need 1 cpu per replica with the amber installation I have, so there is a limit on the number of replicas you can use. My amber installation also doesn't allow you to split one job across multiple nodes. You might not want this anyway as the nodes would have to transfer information with each other at every exchange.
+
+I would recommend running a short pilot simulation for your system (maybe ~1 ns) and see what the exchange rates look like. I usually try to span the temperature range of 300-450K, which requires ~48 replicas for my mini-protein systems. This just fits on the 3219-3620 nodes.
+
+Here's parameters I would use for a pilot simulation:
+```bash
+REPLICAS=48
+TOTAL_EXCHANGES=1000
+T_MAX=450
+EXCHANGE_EVERY_PS=1.0
+```
+Simulation time (ns) = ($TOTAL_EXCHANGES * $EXCHANGE_EVERY_PS) / 1000
+
+I usually set EXCHANGE_EVERY_PS to 1ps but I've seen people use 0.5 - 2 ps.
+
+If the exchange rates are good, I'd do a longer production simulation. I usually aim for 40-100ns for this, but it depends on the protein and timescale of the dynamics you're looking for, which vary wildly
+
+If you can't get good exchange you can lower the max temperature. There are other ways to address this issue that I haven't gotten to work. Let me know if you figure out a solution. Here's some ideas:
+- Compile amber with nvhpc or some tool for splitting jobs across nodes so you can increase the replicates to more than 48. You'll have to write new scripts and it might be slow
+- Change from T-REMD to REST2. I've tried getting REST2 to work (called REAF in amber). It worked at one time, then engaging changed some modules or available software and I cannot get it to work anymore. Might be unrelated to software changes but I don't know. Message me if you want that script. I get segfaults and no clear error message. It might be worth trying to patch amber with PLUMED if that's an option. I have moved over to gromacs instead for this reason.
+
+
+**Replica vs. coordinate set:** Amber uses two indexing schemes. A *coordinate set* carries a fixed set of molecular coordinates. its temperature changes as exchanges are accepted. Raw trajectory files (`_remd.nc.000`, etc.) are therefore indexed by coordinate set and follow one structure as it travels up and down the temperature ladder — they are NOT at a fixed temperature. The demux step in post-processing reconstructs a fixed-temperature trajectory by collecting frames from whichever replica happened to be at 300 K at each exchange step, which is what ends up in `analysis_demux_300K/` and `300K_export/`. For most analyses you want the demuxed fixed-temperature trajectories, not the raw coordinate set trajectories. Amber often refers to a replica as a fixed temperature, in contrast to a coordinate set, which can be confusing.
+
+
+
+
+<!-- - **nodes**: The way that amber is installed in the install scripts, it only supports running a job on 1 node, not splitting across multiple nodes. Splitting across multiple nodes might be slow because information will have to transfer at each exchange step, but if you know better go for it and let me know if it works -->
