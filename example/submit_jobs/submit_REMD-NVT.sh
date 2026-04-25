@@ -6,7 +6,8 @@ export AMBER_SCRIPTS_DIR="/orcd/pool/004/jhalpin/09-fragfold/RELE_simulations/am
 
 # === Job parameters ===
 REPLICAS=48
-TOTAL_EXCHANGES=500000
+TOTAL_EXCHANGES=1000
+T_MIN=300
 T_MAX=450
 EXCHANGE_EVERY_PS=1.0
 
@@ -17,8 +18,8 @@ OUTBASE="$(basename "${PDB_IN%.*}")"
 # === Output directory (auto-named from parameters) ===
 OUTPUT_ROOT="/orcd/pool/004/jhalpin/09-fragfold/RELE_simulations/amber_REMD/example/outputs/output_T-REMD"
 NS=$(awk "BEGIN {print ($TOTAL_EXCHANGES * $EXCHANGE_EVERY_PS) / 1000}")
-OUTDIR="${OUTPUT_ROOT}/${OUTBASE}-${NS}ns-REMD-300-${T_MAX}K-${REPLICAS}reps-NVT"
+OUTDIR="${OUTPUT_ROOT}/${OUTBASE}-${NS}ns-REMD-${T_MIN}-${T_MAX}K-${REPLICAS}reps-NVT"
 
 sbatch -n "$REPLICAS" \
-  --export=ALL,EXCHANGE_EVERY_PS=$EXCHANGE_EVERY_PS,TOTAL_EXCHANGES=$TOTAL_EXCHANGES,T_MAX=$T_MAX,PDB_IN=$PDB_IN,OUTDIR=$OUTDIR,OUTBASE=$OUTBASE \
+  --export=ALL,EXCHANGE_EVERY_PS=$EXCHANGE_EVERY_PS,TOTAL_EXCHANGES=$TOTAL_EXCHANGES,T_MIN=$T_MIN,T_MAX=$T_MAX,PDB_IN=$PDB_IN,OUTDIR=$OUTDIR,OUTBASE=$OUTBASE \
   "${AMBER_SCRIPTS_DIR}/REMD-NVT-singlenode.sbatch"

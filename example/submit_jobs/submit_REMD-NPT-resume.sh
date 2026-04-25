@@ -7,7 +7,7 @@ export AMBER_SCRIPTS_DIR="/orcd/pool/004/jhalpin/09-fragfold/RELE_simulations/am
 
 # === Job parameters (must match the original submission) ===
 REPLICAS=48
-TOTAL_EXCHANGES=250000
+TOTAL_EXCHANGES=1000
 
 # === Point OUTDIR at the existing run's output directory ===
 OUTBASE="helix_fusion"
