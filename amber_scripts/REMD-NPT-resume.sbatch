@@ -93,6 +93,7 @@ echo "[INFO] Segment tag: $SEG_TAG"
 echo "===== STEP 5: Loading environment ====="
 source activate "$CONDA_ENV"
 module purge
+[[ -n "$DEPRECATED_MODULES" ]] && module load "$DEPRECATED_MODULES"
 module load gcc
 module load "$CUDA_MODULE"
 module load "$OPENMPI_MODULE"

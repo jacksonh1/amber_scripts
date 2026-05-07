@@ -82,6 +82,7 @@ conda env create -f installation_scripts/environment.yml
 | `SCRATCH_ROOT` | Fast scratch storage root (e.g. local SSD or parallel fs). Make sure you have a lot of space free here, as the large trajectory files will be saved to this folder |
 | `CUDA_MODULE` | CUDA module name on your cluster |
 | `OPENMPI_MODULE` | OpenMPI module name on your cluster |
+| `DEPRECATED_MODULES` | Module to load before CUDA/OpenMPI if they require it (default: `deprecated-modules`); set to `""` to disable |
 
 **2. Edit the `#SBATCH` headers** in the sbatch scripts you'll use (partition, GPU type):
 

@@ -22,6 +22,7 @@ CURRENT_STEP=0
 
 source activate "$CONDA_ENV"
 module purge
+[[ -n "$DEPRECATED_MODULES" ]] && module load "$DEPRECATED_MODULES"
 module load gcc
 module load "$CUDA_MODULE"
 module load "$OPENMPI_MODULE"

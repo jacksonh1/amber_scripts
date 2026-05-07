@@ -25,3 +25,6 @@ SCRATCH_ROOT="${SCRATCH_ROOT:-/orcd/data/keating/001/jhalpin/MD}"
 # === HPC environment modules ===
 CUDA_MODULE="${CUDA_MODULE:-cuda/12.9.1}"
 OPENMPI_MODULE="${OPENMPI_MODULE:-openmpi/4.1.4}"
+# If CUDA_MODULE or OPENMPI_MODULE are only available via the deprecated-modules
+# system, set this to "deprecated-modules"; otherwise leave empty.
+DEPRECATED_MODULES="${DEPRECATED_MODULES:-deprecated-modules}"
