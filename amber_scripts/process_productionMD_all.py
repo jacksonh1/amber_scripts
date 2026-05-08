@@ -4,7 +4,6 @@ import argparse
 
 import MDAnalysis as mda
 from MDAnalysis.analysis import align, rms
-from MDAnalysis.analysis.rms import RMSF
 from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,7 +20,6 @@ def align_and_strip_trajectory(
     input_traj_format: str = "NCDF",
     output_rmsd: bool = False,
     output_Rg: bool = False,
-    output_rmsf: bool = False,
     in_memory: bool = True,
 ) -> None:
     traj_output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -99,47 +97,8 @@ def align_and_strip_trajectory(
         ax.set_ylabel("Radius of Gyration (Å)")
         fig.savefig(png_output)
         plt.close(fig)
-    if output_rmsf:
-        rmsf_output = traj_output_file.parent / f"{traj_output_file.stem}_rmsf.dat"
-        ca_atoms = protein.select_atoms("name CA")
-        rmsf_analyzer = RMSF(ca_atoms).run()
-        resids = ca_atoms.resids
-        rmsf_vals = rmsf_analyzer.results.rmsf
-        np.savetxt(rmsf_output, np.column_stack([resids, rmsf_vals]), delimiter=",", header="resid,rmsf_A")
-        png_output = traj_output_file.parent / f"{traj_output_file.stem}_rmsf.png"
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.plot(resids, rmsf_vals)
-        ax.fill_between(resids, 0, rmsf_vals, alpha=0.25)
-        ax.set_xlabel("Residue")
-        ax.set_ylabel("RMSF (Å)")
-        fig.savefig(png_output)
-        plt.close(fig)
     if tmp_path is not None and tmp_path.exists():
         os.remove(tmp_path)
-
-
-def restore_chain_ids(pdb_path: Path, pdb4amber_path: Path) -> None:
-    """Rewrite chain IDs in pdb_path using pdb4amber.pdb as reference."""
-    ref = mda.Universe(str(pdb4amber_path))
-    resid_to_chain = {}
-    for res in ref.residues:
-        chain = res.segment.segid.strip()
-        if not chain:
-            chain = 'A'
-        resid_to_chain[res.resid] = chain
-
-    lines = pdb_path.read_text().splitlines()
-    new_lines = []
-    for line in lines:
-        if line.startswith(('ATOM', 'HETATM')) and len(line) >= 26:
-            try:
-                resid = int(line[22:26].strip())
-                chain = resid_to_chain.get(resid, 'X')
-                line = line[:21] + chain + line[22:]
-            except ValueError:
-                pass
-        new_lines.append(line)
-    pdb_path.write_text('\n'.join(new_lines) + '\n')
 
 
 def find_file(folder: Path, pattern: str) -> Path:
@@ -151,20 +110,14 @@ def find_file(folder: Path, pattern: str) -> Path:
     return found_files[0]
 
 
-def strip_trajectories(folder: Path, overwrite: bool = False, stride: int = 1):
+def strip_trajectories(folder: Path, overwrite: bool = False):
     print(f"Processing folder: {folder}")
     output_dir = folder
     try:
         topology_input_file = find_file(folder, "*.prmtop")
-        try:
-            trajectory_input_file = find_file(folder, "*_prod_imaged_stripped.nc")
-        except FileNotFoundError:
-            try:
-                trajectory_input_file = find_file(folder, "*_prod_imaged.nc")
-            except FileNotFoundError:
-                trajectory_input_file = find_file(folder, "*_prod.nc")
-        trajectory_output_file = output_dir / (topology_input_file.stem + "_prod_stripped.xtc")
-        pdb_output_file = output_dir / (topology_input_file.stem + "_prod_f1_stripped.pdb")
+        trajectory_input_file = find_file(folder, "*_prod.nc")
+        trajectory_output_file = output_dir / trajectory_input_file.name.replace("_prod.nc", "_prod_stripped.xtc")
+        pdb_output_file = output_dir / trajectory_input_file.name.replace("_prod.nc", "prod_f1_stripped.pdb")
     except FileNotFoundError as e:
         print(e)
         return
@@ -178,25 +131,19 @@ def strip_trajectories(folder: Path, overwrite: bool = False, stride: int = 1):
         pdb_output_file=pdb_output_file,
         output_rmsd=True,
         output_Rg=True,
-        output_rmsf=True,
-        trajout_slice=slice(None, None, stride),
+        # trajout_slice=slice(-2000, None),
     )
-    pdb4amber_path = folder / "pdb4amber.pdb"
-    if pdb4amber_path.exists():
-        restore_chain_ids(pdb_output_file, pdb4amber_path)
-        print(f"[OK] Chain IDs restored from {pdb4amber_path.name}")
-    else:
-        print(f"[WARN] pdb4amber.pdb not found; chain IDs not restored")
 
 
-def main(md_folder: Path, overwrite: bool = False, stride: int = 1):
-    strip_trajectories(md_folder, overwrite=overwrite, stride=stride)
+def main(md_parent_folder: Path, overwrite: bool = False):
+    for folder in md_parent_folder.iterdir():
+        if folder.is_dir():
+            strip_trajectories(folder, overwrite=overwrite)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Process production MD trajectories.")
-    parser.add_argument("--md_folder", type=Path, help="Path to the folder containing the production MD trajectories.")
+    parser.add_argument("--md_parent_folder", type=Path, help="Path to the folder containing the production MD trajectories.", default="./output_MD/")
     parser.add_argument("--overwrite", action="store_true", help="Whether to overwrite existing output files.")
-    parser.add_argument("--stride", type=int, default=1, help="Keep every Nth frame (default: 1 = all frames).")
     args = parser.parse_args()
-    main(Path(args.md_folder), overwrite=args.overwrite, stride=args.stride)
+    main(Path(args.md_parent_folder), overwrite=args.overwrite)

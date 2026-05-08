@@ -327,6 +327,14 @@ ln -sf "${SCRATCH_DIR}/${OUTBASE}_density.nc" "${OUTDIR}/${OUTBASE}_density.nc"
 ln -sf "${SCRATCH_DIR}/${OUTBASE}_eq.nc" "${OUTDIR}/${OUTBASE}_eq.nc"
 ln -sf "${SCRATCH_DIR}/${OUTBASE}_prod.nc" "${OUTDIR}/${OUTBASE}_prod.nc"
 
+############################
+# ==== POST-PROCESSING ==== #
+############################
+CURRENT_STEP=9
+echo "===== STEP 9: Post-processing ====="
+bash "${AMBER_SCRIPTS_DIR}/post_process_MD.sh" "$OUTDIR" "$OUTBASE" "$PRMTOP" "$PROD_NC" "$AMBER_SCRIPTS_DIR"
+echo "[OK] Post-processing done"
+
 echo ""
 echo "=========================================="
 echo "===== JOB COMPLETED $(date) ====="
@@ -342,4 +350,8 @@ echo "  - outputs/*: MD output files (.out)"
 echo "  - restarts/*: Restart files (.rst)"
 echo "  - *.nc: Trajectory symlinks → $SCRATCH_DIR"
 echo "  - ${OUTBASE}_final.pdb"
+echo "  - ${OUTBASE}_prod_imaged_stripped.nc: imaged, protein-only trajectory (on scratch, symlinked)"
+echo "  - ${OUTBASE}_prod_stripped.xtc: protein-only aligned trajectory (MDAnalysis output)"
+echo "  - ${OUTBASE}_prod_f1_stripped.pdb: first-frame reference structure"
+echo "  - ${OUTBASE}_prod_stripped_rmsd.dat/png, _Rg.dat/png, _rmsf.dat/png: analysis outputs"
 echo "=========================================="

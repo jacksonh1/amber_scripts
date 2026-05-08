@@ -17,6 +17,10 @@ See the [Recommendations](#recommendations) section for how I would use these to
 │   ├── REMD-NVT-resume.sbatch
 │   ├── REMD-NPT-resume.sbatch
 │   ├── MD.sbatch
+│   ├── post_process_MD.sh       ← called automatically by MD.sbatch
+│   ├── image_MD_solvent.sh      ← manual: image traj keeping full solvent
+│   ├── process_productionMD.py  ← align, strip, RMSD/Rg/RMSF analysis
+│   ├── cluster_MD.py            ← cluster stripped trajectory by Cα RMSD
 │   ├── reconstruct_300K-parallel.sh
 │   ├── reconstruct_300K.sh
 │   ├── rem_accept_cpptraj.py
@@ -61,6 +65,18 @@ Runs replicas at constant volume. Simpler setup, no box size equilibration neede
 4. Per-replica NVT equilibration (each replica heated to its own target temperature from the same box)
 5. T-REMD production (all replicas in parallel, exchanging temperatures every `EXCHANGE_EVERY_PS`)
 6. Post-processing: reconstruct 300 K trajectory, compute acceptance rates
+
+### Standard MD
+
+Single-temperature NPT production run on one GPU.
+
+1. Build system with tleap (solvate, add ions)
+2. Two-stage minimization (restrained solute, then weaker restraint)
+3. Heating: 0 → `TEMP0` K over 50 ps (NVT)
+4. NPT density equilibration (200 ps, restrained solute)
+5. NPT equilibration (500 ps, unrestrained)
+6. NPT production (`PROD_NS` ns)
+7. Post-processing (automatic): strip solvent, align, compute RMSD/Rg/RMSF
 
 
 ## Setup (do this once per cluster)
@@ -150,12 +166,100 @@ bash my_resume.sh
 Safe to re-run multiple times. Each restart creates a new trajectory segment; segments
 are concatenated automatically at the end.
 
+### MD post-processing
+
+Post-processing runs automatically at the end of `MD.sbatch` via `post_process_MD.sh`. It can also be run manually on an existing MD output directory:
+
+```bash
+bash amber_scripts/post_process_MD.sh <OUTDIR> <OUTBASE> <PRMTOP> <PROD_NC> <AMBER_SCRIPTS_DIR>
+```
+
+**What it does:**
+
+1. **cpptraj** (`autoimage` + `center` + `strip :WAT,Na+,Cl-`) → `*_prod_imaged_stripped.nc` on scratch, symlinked into `OUTDIR`
+2. **Python** (`process_productionMD.py`) → aligns protein backbone to frame 1, writes:
+   - `*_prod_stripped.xtc` — protein-only aligned trajectory (XTC, for MDAnalysis/ChimeraX)
+   - `*_prod_f1_stripped.pdb` — first-frame reference structure (chain IDs restored from `pdb4amber.pdb`)
+   - `*_prod_stripped_rmsd.dat/png` — backbone RMSD vs. frame
+   - `*_prod_stripped_Rg.dat/png` — radius of gyration vs. frame
+   - `*_prod_stripped_rmsf.dat/png` — per-residue Cα RMSF
+
+To subsample the trajectory (reduces XTC file size at the cost of time resolution):
+
+```bash
+python amber_scripts/process_productionMD.py --md_folder <OUTDIR> --stride 10
+```
+
+To image the trajectory while keeping the full solvent (rare; for inspecting water/ions in VMD):
+
+```bash
+bash amber_scripts/image_MD_solvent.sh <OUTDIR> <OUTBASE> <PRMTOP> <PROD_NC>
+```
+
+This writes `*_prod_imaged.nc` to scratch and symlinks it into `OUTDIR`. It does **not** strip solvent.
+
+### Clustering
+
+Cluster the stripped/aligned trajectory by Cα RMSD using k-means or DBSCAN:
+
+```bash
+python amber_scripts/cluster_MD.py --md_folder <OUTDIR> [options]
+```
+
+Key options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--method` | `kmeans` | `kmeans` or `dbscan` |
+| `--n_clusters` | `5` | Number of clusters (k-means only) |
+| `--epsilon` | `2.0` | DBSCAN epsilon (Å) |
+| `--min_samples` | `10` | DBSCAN min_samples |
+| `--stride` | `1` | Use every Nth frame |
+| `--selection` | `name CA` | MDAnalysis atom selection for clustering |
+| `--outdir` | `<md_folder>/clustering` | Output directory |
+
+Outputs (in `<md_folder>/clustering/`):
+
+- `cluster00_rep.pdb` … `clusterN_rep.pdb` — all-atom protein PDB for the representative frame of each cluster (chain IDs restored)
+- `cluster_assignments.csv` — per-frame cluster label
+- `cluster_populations.png` — bar chart of cluster sizes
+- `cluster_timeseries.png` — cluster assignment vs. frame
+
 There will probably be a smaller number of frames exported in the final trajectories. This is because
 it writes a frame every 10 exchanges (default) and was probably interrupted in between 2 write time points. It
 likely doesn't matter. You can back calculate the time corresponding to each frame if you need to (maybe from the rem log)
 but you probably don't need that info
 
 ## Output directory layout
+
+### Standard MD
+
+```
+${OUTDIR}/
+├── *.prmtop, *.inpcrd            — topology and coordinates
+├── *_init.pdb, *_final.pdb       — initial and final structures
+├── pdb4amber.pdb                 — pdb4amber-cleaned input (chain ID reference)
+├── inputs/                       — Amber input files (min, heat, equil, prod)
+├── outputs/                      — Amber .out files for each stage
+├── restarts/                     — .rst checkpoint files
+├── *_heat.nc, *_density.nc,
+│   *_eq.nc, *_prod.nc            — symlinks → scratch trajectories
+├── *_prod_imaged_stripped.nc     — symlink → solvent-stripped trajectory on scratch
+├── *_prod_stripped.xtc           — protein-only aligned trajectory (analysis-ready)
+├── *_prod_f1_stripped.pdb        — first-frame reference structure (chain IDs restored)
+├── *_prod_stripped_rmsd.dat/png  — backbone RMSD vs. frame
+├── *_prod_stripped_Rg.dat/png    — radius of gyration vs. frame
+├── *_prod_stripped_rmsf.dat/png  — per-residue Cα RMSF
+└── clustering/                   — cluster_MD.py output (if run)
+    ├── cluster00_rep.pdb …       — cluster representative structures
+    ├── cluster_assignments.csv
+    ├── cluster_populations.png
+    └── cluster_timeseries.png
+```
+
+The key outputs for analysis are `*_prod_stripped.xtc` + `*_prod_f1_stripped.pdb` — load both together in ChimeraX or MDAnalysis. Raw NetCDF trajectories live on scratch (`SCRATCH_ROOT`) and are symlinked; copy them before scratch is cleaned if you need them.
+
+### T-REMD
 
 ```
 ${OUTDIR}/
